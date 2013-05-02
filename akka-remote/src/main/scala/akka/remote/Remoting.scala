@@ -485,13 +485,13 @@ private[remote] class EndpointManager(conf: Config, log: LoggingAdapter) extends
         case Some(Pass(endpoint)) ⇒
           endpoint ! s
         case Some(Gated(timeOfRelease)) ⇒
-          if (timeOfRelease.isOverdue()) createAndRegisterWritingEndpoint(None) ! s
+          if (timeOfRelease.isOverdue()) createAndRegisterWritingEndpoint(refuseUid = None) ! s
           else extendedSystem.deadLetters ! s
         case Some(Quarantined(uid, timeOfRelease)) ⇒
-          if (timeOfRelease.isOverdue()) createAndRegisterWritingEndpoint(None) ! s
-          else createAndRegisterWritingEndpoint(Some(uid)) ! s
+          if (timeOfRelease.isOverdue()) createAndRegisterWritingEndpoint(refuseUid = None) ! s
+          else createAndRegisterWritingEndpoint(refuseUid = Some(uid)) ! s
         case None ⇒
-          createAndRegisterWritingEndpoint(None) ! s
+          createAndRegisterWritingEndpoint(refuseUid = None) ! s
 
       }
 
