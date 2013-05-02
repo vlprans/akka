@@ -13,7 +13,7 @@ import scala.concurrent.Await
 object AkkaProtocolStressTest {
   val configA: Config = ConfigFactory parseString ("""
     akka {
-      #loglevel = DEBUG
+      loglevel = DEBUG
       actor.provider = "akka.remote.RemoteActorRefProvider"
 
       remote.log-remote-lifecycle-events = on
