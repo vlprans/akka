@@ -28,7 +28,8 @@ object UnreachableNodeJoinsAgainMultiNodeConfig extends MultiNodeConfig {
 
   commonConfig(ConfigFactory.parseString(
     """
-      akka.remote.log-remote-lifecycle-events = off
+      akka.loglevel=DEBUG
+      akka.remote.log-remote-lifecycle-events = on
       akka.cluster.publish-stats-interval = 0s
     """).withFallback(debugConfig(on = false).withFallback(MultiNodeClusterSpec.clusterConfig)))
 
@@ -194,7 +195,7 @@ abstract class UnreachableNodeJoinsAgainSpec
         awaitMembersUp(expectedNumberOfMembers)
         // don't end the test until the freshSystem is done
         runOn(master) {
-          expectMsg(EndActor.End)
+          expectMsg(20 seconds, EndActor.End)
         }
         endBarrier()
       }
