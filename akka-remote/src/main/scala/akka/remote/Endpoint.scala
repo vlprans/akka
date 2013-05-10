@@ -245,7 +245,8 @@ private[remote] class ReliableDeliverySupervisor(
     case Terminated(_) ⇒
       currentHandle = None
       context.become(idle)
-    case GotUid(u) ⇒ uid = Some(u)
+    case GotUid(u)                     ⇒ uid = Some(u)
+    case s: EndpointWriter.StopReading ⇒ writer forward s
   }
 
   def gated: Receive = {
@@ -366,6 +367,8 @@ private[remote] object EndpointWriter {
   case object BackoffTimer
   case object FlushAndStop
   case object AckIdleCheckTimer
+  case class StopReading(newHandle: AkkaProtocolHandle)
+  case class StoppedReading(newHandle: AkkaProtocolHandle)
 
   case class OutboundAck(ack: Ack)
 
@@ -536,6 +539,9 @@ private[remote] class EndpointWriter(
   whenUnhandled {
     case Event(Terminated(r), _) if r == reader.orNull ⇒
       publishAndThrow(new EndpointDisassociatedException("Disassociated"))
+    case Event(s: StopReading, _) ⇒
+      reader foreach (_ forward s)
+      stay()
     case Event(TakeOver(newHandle), _) ⇒
       // Shutdown old reader
       handle foreach { _.disassociate() }
@@ -630,7 +636,7 @@ private[remote] class EndpointReader(
   val reliableDeliverySupervisor: Option[ActorRef],
   val receiveBuffers: ConcurrentHashMap[Link, AckedReceiveBuffer[Message]]) extends EndpointActor(localAddress, remoteAddress, transport, settings, codec) {
 
-  import EndpointWriter.OutboundAck
+  import EndpointWriter.{ OutboundAck, StopReading, StoppedReading }
 
   val provider = RARP(context.system).provider
   var ackedReceiveBuffer = new AckedReceiveBuffer[Message]
@@ -644,8 +650,9 @@ private[remote] class EndpointReader(
     }
   }
 
-  override def postStop(): Unit = {
+  override def postStop(): Unit = saveState()
 
+  def saveState(): Unit = {
     @tailrec
     def updateSavedState(key: Link, expectedState: AckedReceiveBuffer[Message]): Unit = {
       if (expectedState eq null) {
@@ -669,6 +676,7 @@ private[remote] class EndpointReader(
       msgOption match {
         case Some(msg) ⇒
           if (msg.reliableDeliveryEnabled) {
+            println(" XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ")
             ackedReceiveBuffer = ackedReceiveBuffer.receive(msg)
             deliverAndAck()
           } else msgDispatch.dispatch(msg.recipient, msg.recipientAddress, msg.serializedMessage, msg.senderOption)
@@ -680,6 +688,24 @@ private[remote] class EndpointReader(
       publishError(new OversizedPayloadException(s"Discarding oversized payload received: " +
         s"max allowed size [${transport.maximumPayloadBytes}] bytes, actual size [${oversized.size}] bytes."))
 
+    case StopReading(newHandle) ⇒
+      println(" ### Stopping reading")
+      self forward StoppedReading(newHandle)
+
+    case s: StoppedReading ⇒
+      println(" ### Stopped reading")
+      sender ! s
+      saveState()
+      context.become(notReading)
+
+  }
+
+  def notReading: Receive = {
+    case Disassociated          ⇒ context.stop(self)
+
+    case StopReading(newHandle) ⇒ sender ! StoppedReading(newHandle)
+
+    case _                      ⇒
   }
 
   private def deliverAndAck(): Unit = {

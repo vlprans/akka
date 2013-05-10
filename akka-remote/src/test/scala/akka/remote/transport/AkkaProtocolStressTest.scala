@@ -50,6 +50,7 @@ object AkkaProtocolStressTest {
       }
       case seq: Int ⇒
         if (seq > maxSeq) {
+          println(seq)
           losses += seq - maxSeq - 1
           maxSeq = seq
           if (seq > limit * 0.9) {

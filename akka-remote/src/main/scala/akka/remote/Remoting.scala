@@ -499,7 +499,11 @@ private[remote] class EndpointManager(conf: Config, log: LoggingAdapter) extends
       case Some(endpoint) ⇒ endpoint ! EndpointWriter.TakeOver(handle)
       case None ⇒
         if (endpoints.isQuarantined(handle.remoteAddress, handle.handshakeInfo.uid)) handle.disassociate()
-        else {
+        else if (endpoints.hasWritableEndpointFor(handle.remoteAddress)) {
+          endpoints.writableEndpointWithPolicyFor(handle.remoteAddress) match {
+            case Some(Pass(ep)) ⇒ ep ! EndpointWriter.StopReading(handle)
+          }
+        } else {
           val writing = settings.UsePassiveConnections && !endpoints.hasWritableEndpointFor(handle.remoteAddress)
           eventPublisher.notifyListeners(AssociatedEvent(handle.localAddress, handle.remoteAddress, true))
           val endpoint = createEndpoint(
@@ -516,6 +520,19 @@ private[remote] class EndpointManager(conf: Config, log: LoggingAdapter) extends
             endpoints.registerReadOnlyEndpoint(handle.remoteAddress, endpoint)
         }
     }
+    case EndpointWriter.StoppedReading(handle) ⇒
+      println(" ### Creating new reader")
+      eventPublisher.notifyListeners(AssociatedEvent(handle.localAddress, handle.remoteAddress, true))
+      val endpoint = createEndpoint(
+        handle.remoteAddress,
+        handle.localAddress,
+        transportMapping(handle.localAddress),
+        settings,
+        Some(handle),
+        refuseUid = None,
+        writing = false)
+      endpoints.registerReadOnlyEndpoint(handle.remoteAddress, endpoint)
+
     case Terminated(endpoint) ⇒
       endpoints.unregisterEndpoint(endpoint)
     case Prune ⇒
