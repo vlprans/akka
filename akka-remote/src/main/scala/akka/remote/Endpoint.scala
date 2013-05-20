@@ -504,12 +504,14 @@ private[remote] class EndpointWriter(
 
             val pduSize = pdu.size
             remoteMetrics.logPayloadBytes(msg, pduSize)
+            println(s"# EndpointWriter ${self} writing ${pduSize} bytes: ${msg} from ${senderOption} to ${recipient}")
 
             if (pduSize > transport.maximumPayloadBytes) {
               publishAndStay(new OversizedPayloadException(s"Discarding oversized payload sent to ${recipient}: max allowed size ${transport.maximumPayloadBytes} bytes, actual size of encoded ${msg.getClass} was ${pdu.size} bytes."))
             } else if (h.write(pdu)) {
               stay()
             } else {
+              println(s"# EndpointWriter ${self} write=false ${pduSize} bytes: ${msg}")
               if (seqOption.isEmpty) stash()
               goto(Buffering)
             }

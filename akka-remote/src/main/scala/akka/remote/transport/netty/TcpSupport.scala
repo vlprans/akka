@@ -87,9 +87,15 @@ private[remote] class TcpAssociationHandle(val localAddress: Address,
 
   override def write(payload: ByteString): Boolean =
     if (channel.isWritable && channel.isOpen) {
-      channel.write(ChannelBuffers.wrappedBuffer(payload.asByteBuffer))
+      val buf = payload.asByteBuffer
+      println(s"# TcpAssociationHandle write ${payload.size} bytes")
+      channel.write(ChannelBuffers.wrappedBuffer(buf))
       true
-    } else false
+    } else {
+      val buf = payload.asByteBuffer
+      println(s"# TcpAssociationHandle no write ${payload.size} bytes, writable: ${channel.isWritable} open: ${channel.isOpen}")
+      false
+    }
 
   override def disassociate(): Unit = NettyTransport.gracefulClose(channel)
 }

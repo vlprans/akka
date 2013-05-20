@@ -24,7 +24,10 @@ object NewRemoteActorMultiJvmSpec extends MultiNodeConfig {
   }
 
   commonConfig(debugConfig(on = false).withFallback(
-    ConfigFactory.parseString("akka.remote.log-remote-lifecycle-events = off")))
+    ConfigFactory.parseString("""
+        akka.loglevel=DEBUG
+        akka.remote.log-received-messages=on
+        akka.remote.log-remote-lifecycle-events = on""")))
 
   val master = role("master")
   val slave = role("slave")
@@ -91,6 +94,7 @@ class NewRemoteActorSpec extends MultiNodeSpec(NewRemoteActorMultiJvmSpec)
         //  - remote system never gets watch, but DeathWatch heartbeats time out, and AddressTerminated is generated
         //    (this needs some time to happen)
         watch(actor)
+        //        Thread.sleep(2000)
 
         enterBarrier("deployed")
 

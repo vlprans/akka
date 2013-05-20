@@ -70,16 +70,26 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
 
   // TODO this should be removed and be replaced with `set - subject`
   //   when all actor references have uid, i.e. actorFor is removed
-  private def removeFromSet(subject: ActorRef, set: Set[ActorRef]): Set[ActorRef] =
-    if (subject.path.uid != ActorCell.undefinedUid) (set - subject) - new UndefinedUidActorRef(subject)
-    else set filterNot (_.path == subject.path)
+  private def removeFromSet(subject: ActorRef, set: Set[ActorRef]): Set[ActorRef] = {
+    val removed = if (set(subject)) set - subject else set
+    if (subject.path.uid != ActorCell.undefinedUid)
+      removed - new UndefinedUidActorRef(subject)
+    else removed filterNot (_.path == subject.path)
+  }
+  //  private def removeFromSet(subject: ActorRef, set: Set[ActorRef]): Set[ActorRef] =
+  //    if (subject.path.uid != ActorCell.undefinedUid) (set - subject) - new UndefinedUidActorRef(subject)
+  //    else set filterNot (_.path == subject.path)
 
   protected def tellWatchersWeDied(actor: Actor): Unit =
     if (!watchedBy.isEmpty) {
       try {
         def sendTerminated(ifLocal: Boolean)(watcher: ActorRef): Unit =
-          if (watcher.asInstanceOf[ActorRefScope].isLocal == ifLocal) watcher.asInstanceOf[InternalActorRef].sendSystemMessage(
-            DeathWatchNotification(self, existenceConfirmed = true, addressTerminated = false))
+          if (watcher.asInstanceOf[ActorRefScope].isLocal == ifLocal) {
+            if (self.path.name.endsWith("hello3")) {
+              println(s"# tellWatchersWeDied ${self} -> ${watcher}")
+            }
+            watcher.asInstanceOf[InternalActorRef].sendSystemMessage(DeathWatchNotification(self, existenceConfirmed = true, addressTerminated = false))
+          }
 
         /*
          * It is important to notify the remote watchers first, otherwise RemoteDaemon might shut down, causing
